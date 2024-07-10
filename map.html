@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROJECT RECON</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        /* Your existing CSS */
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #2c2c2c;
+            color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        #header {
+            background-color: #1e1e1e;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #444;
+        }
+        #header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        #header .logout-button, #header .add-property-button {
+            background-color: #444;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #header .logout-button:hover, #header .add-property-button:hover {
+            background-color: #666;
+        }
+        #content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        #map {
+            height: calc(100vh - 80px);
+            flex: 1;
+        }
+        #rottingChart {
+            width: 300px;
+            overflow-y: auto;
+            background-color: #333;
+            padding: 10px;
+            border-left: 2px solid #444;
+            height: calc(100vh - 80px);
+            box-sizing: border-box;
+        }
+        .popup-content {
+            background-color: #444;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .popup-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .popup-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+        }
+        .popup-info {
+            margin-bottom: 5px;
+        }
+        .popup-notes {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #555;
+            color: white;
+            box-sizing: border-box;
+        }
+        .save-notes-button {
+            background-color: #FF0000;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+        .save-notes-button:hover {
+            background-color: #B22222;
+        }
+        .rotting-chart-item {
+            padding: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .rotting-chart-item .property-name {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .rotting-chart-item .property-details {
+            margin-top: 5px;
+        }
+        .rotting-chart-item .step {
+            display: flex;
+            align-items: center;
+        }
+        .dark-red { background-color: #8B0000; color: white; }
+        .red { background-color: #FF0000; color: white; }
+        .orange { background-color: #FFA500; color: black; }
+        .green { background-color: #008000; color: white; }
+        .black { background-color: #000000; color: white; }
+        .blue { background-color: #0000FF; color: white; }
+        .delete-button {
+            background-color: #FF0000;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+        .delete-button:hover {
+            background-color: #B22222;
+        }
+        #searchBar {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        #footer {
+            background-color: #000;
+            height: 40px;
+            width: 100%;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+        }
+        form {
+            display: none;
+            margin: 10px;
+            padding: 20px;
+            border: 2px solid #444;
+            border-radius: 5px;
+            background-color: #333;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            color: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+        }
+        form input, form textarea, form select {
+            margin-bottom: 10px;
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            box-sizing: border-box;
+            background-color: #444;
+            color: white;
+        }
+        form input[type="file"] {
+            padding: 5px;
+        }
+        .exit-button {
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .exit-button:hover {
+            background-color: #666;
+        }
+    </style>
+    <link rel="icon" href="data:," type="image/x-icon">
+</head>
+<body>
+    <script>
+        if (localStorage.getItem('loggedIn') !== 'true') {
+            window.location.href = 'index.html';
+        }
+    </script>
+    <div id="header">
+        <button class="logout-button" id="logoutButton">Logout</button>
+        <h1>PROJECT RECON</h1>
+        <button class="add-property-button" id="addPropertyButton">Add Property</button>
+    </div>
+
+    <input type="text" id="searchBar" placeholder="Search for a property...">
+
+    <form id="propertyForm">
+        <button type="button" class="exit-button" id="exitFormButton">Exit</button>
+        <label for="PropertyName">Property Name:</label>
+        <input type="text" name="PropertyName" id="PropertyName" placeholder="Property Name" required><br>
+        <label for="LandRegistryNumber">Land Registry Number:</label>
+        <input type="text" name="LandRegistryNumber" id="LandRegistryNumber" placeholder="Land Registry Number" required><br>
+        <label for="HouseNumber">House Number:</label>
+        <input type="text" name="HouseNumber" id="HouseNumber" placeholder="House Number" required><br>
+        <label for="StreetName">Street Name:</label>
+        <input type="text" name="StreetName" id="StreetName" placeholder="Street Name" required><br>
+        <label for="Postcode">Postcode:</label>
+        <input type="text" name="Postcode" id="Postcode" placeholder="Postcode" required><br>
+        <label for="Latitude">Latitude:</label>
+        <input type="text" name="Latitude" id="Latitude" placeholder="Latitude" required><br>
+        <label for="Longitude">Longitude:</label>
+        <input type="text" name="Longitude" id="Longitude" placeholder="Longitude" required><br>
+        <label for="Notes">Notes:</label>
+        <textarea name="Notes" id="Notes" placeholder="Notes"></textarea><br>
+        <label for="DateOfFinding">Date of Finding (DD/MM/YYYY):</label>
+        <input type="text" name="DateOfFinding" id="DateOfFinding" placeholder="Date of Finding (DD/MM/YYYY)" required><br>
+        <label for="Status">Status:</label>
+        <select name="Status" id="Status" required>
+            <option value="">Select Status</option>
+            <option value="Squatters">Squatters</option>
+            <option value="Demolision Started">Demolition Started</option>
+            <option value="Default">Default</option>
+            <option value="Rave">Rave</option>
+            <option value="Security">Security</option>
+        </select><br>
+        <label for="image">Image:</label>
+        <input type="file" name="image" id="image" accept="image/*"><br>
+        <button type="submit">Add Property</button>
+    </form>
+
+    <div id="content">
+        <div id="map"></div>
+        <div id="rottingChart"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        var map = L.map('map').setView([51.5074, -0.1278], 10); // Centered on London
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const iconSkull = L.icon({
+            iconUrl: 'skull.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const iconDemolish = L.icon({
+            iconUrl: 'cone.png',
+            iconSize: [45, 45],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const iconDefault = L.icon({
+            iconUrl: 'default.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const iconRave = L.icon({
+            iconUrl: 'rave.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const iconSecurity = L.icon({
+            iconUrl: 'security.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        let projectReconData, imagesData, scoreData, markers = {};
+
+        fetch('/data')
+        .then(response => response.json())
+        .then(data => {
+            projectReconData = data.projectReconData;
+            imagesData = data.imagesData;
+            scoreData = data.scoreData;
+            refreshMap();
+            refreshRottingChart();
+        })
+        .catch(error => console.error('Error loading data:', error));
+
+        function refreshMap() {
+            const images = imagesData.reduce((acc, curr) => {
+                acc[curr.PropertyName] = curr.ImageURL;
+                return acc;
+            }, {});
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            markers = {};
+
+            projectReconData.forEach(property => {
+                const image = images[property.PropertyName];
+
+                if (property.Latitude && property.Longitude) {
+                    const Latitude = parseFloat(property.Latitude);
+                    const Longitude = parseFloat(property.Longitude);
+
+                    let icon = iconDefault;
+                    if (property.Status.includes('Squatters')) {
+                        icon = iconSkull;
+                    } else if (property.Status.includes('Demolision Started')) {
+                        icon = iconDemolish;
+                    } else if (property.Status.includes('Rave')) {
+                        icon = iconRave;
+                    } else if (property.Status.includes('Security')) {
+                        icon = iconSecurity;
+                    }
+
+                    const popupContent = `
+                        <div class="popup-content">
+                            <div class="popup-title">${property.PropertyName}</div>
+                            ${image ? `<img src="${image}" class="popup-image">` : ''}
+                            <div class="popup-info">Land Registry Number: ${property.LandRegistryNumber}</div>
+                            <div class="popup-info">House Number: ${property.HouseNumber}</div>
+                            <div class="popup-info">Street Name: ${property.StreetName}</div>
+                            <div class="popup-info">Postcode: ${property.Postcode}</div>
+                            <div class="popup-info">Notes: <textarea class="popup-notes" data-property="${property.PropertyName}">${property.Notes}</textarea></div>
+                            <button class="save-notes-button" data-property="${property.PropertyName}">Save Notes</button>
+                            <div class="popup-info">Updates From The Client: ${property.UpdatesFromTheClient}</div>
+                            <div class="popup-info">Status: ${property.Status}</div>
+                            <button class="delete-button" onclick="promptDeleteProperty('${property.PropertyName}')">Delete Property</button>
+                        </div>`;
+
+                    const marker = L.marker([Latitude, Longitude], { icon }).addTo(map).bindPopup(popupContent);
+                    markers[property.PropertyName] = marker;
+                }
+            });
+
+            map.on('popupopen', function(e) {
+                const propertyName = e.popup.getContent().match(/data-property="([^"]+)"/)[1];
+                const notesTextarea = document.querySelector(`.popup-notes[data-property="${propertyName}"]`);
+                const saveNotesButton = document.querySelector(`.save-notes-button[data-property="${propertyName}"]`);
+
+                if (saveNotesButton) {
+                    saveNotesButton.addEventListener('click', function() {
+                        const updatedNotes = notesTextarea.value;
+                        updatePropertyNotes(propertyName, updatedNotes);
+                    });
+                }
+            });
+        }
+
+        function updatePropertyNotes(propertyName, notes) {
+            fetch('/updateProperty', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ PropertyName: propertyName, Notes: notes })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                refreshMap();
+            })
+            .catch(error => console.error('Error updating notes:', error));
+        }
+
+        function refreshRottingChart(filter = '') {
+            const rottingChart = document.getElementById('rottingChart');
+            rottingChart.innerHTML = ''; // Clear existing content
+
+            const now = new Date();
+            const properties = scoreData.map(property => {
+                if (!property.DateOfFinding) {
+                    console.error('Missing DateOfFinding for property:', property);
+                    return null;
+                }
+
+                const [day, month, year] = property.DateOfFinding.split('/');
+                if (!day || !month || !year) {
+                    console.error('Invalid DateOfFinding format for property:', property);
+                    return null;
+                }
+
+                const dateOfFinding = new Date(year, month - 1, day);
+                const daysSinceFinding = Math.floor((now - dateOfFinding) / (1000 * 60 * 60 * 24));
+
+                const stepsCompleted = ['LandRegistryFound', 'ContactMade', 'SiteVisitBooked', 'ContractQuoted', 'SignedBuildingAquired'].filter(step => property[step] === 'Y').length;
+
+                let colorClass = '';
+                if (property.Closed === 'W') {
+                    colorClass = 'blue';
+                } else if (property.Closed === 'L') {
+                    colorClass = 'black';
+                } else if (daysSinceFinding > 14) {
+                    colorClass = 'dark-red';
+                } else if (daysSinceFinding <= 3 && stepsCompleted === 0) {
+                    colorClass = 'orange';
+                } else if (daysSinceFinding <= 7 && stepsCompleted === 0) {
+                    colorClass = 'red';
+                } else if (stepsCompleted > 0 || daysSinceFinding <= 3) {
+                    colorClass = 'green';
+                } else {
+                    colorClass = 'orange';
+                }
+
+                return {
+                    name: property.PropertyName,
+                    daysSinceFinding,
+                    stepsCompleted,
+                    colorClass,
+                    closed: property.Closed
+                };
+            }).filter(property => property !== null);
+
+            properties
+                .filter(property => property.name.toLowerCase().includes(filter.toLowerCase()))
+                .sort((a, b) => {
+                    const colorOrder = ['dark-red', 'red', 'orange', 'green', 'blue', 'black'];
+                    return colorOrder.indexOf(a.colorClass) - colorOrder.indexOf(b.colorClass) || b.stepsCompleted - a.stepsCompleted;
+                })
+                .forEach((property, index) => {
+                    const div = document.createElement('div');
+                    div.className = `rotting-chart-item ${property.colorClass}`;
+                    div.innerHTML = `
+                        <div class="property-name">${property.name}</div>
+                        <div class="property-details">Steps: ${property.stepsCompleted} - Days Since Finding: ${property.daysSinceFinding}</div>
+                        ${property.closed !== 'W' && property.closed !== 'L' ? `
+                            <div class="step"><input type="checkbox" class="steps-checkbox" id="LandRegistryFound-${index}" name="LandRegistryFound-${index}" data-property="${property.name}" data-step="LandRegistryFound" ${property.stepsCompleted > 0 ? 'checked' : ''}> Land Registry Found</div>
+                            <div class="step"><input type="checkbox" class="steps-checkbox" id="ContactMade-${index}" name="ContactMade-${index}" data-property="${property.name}" data-step="ContactMade" ${property.stepsCompleted > 1 ? 'checked' : ''}> Contact Made</div>
+                            <div class="step"><input type="checkbox" class="steps-checkbox" id="SiteVisitBooked-${index}" name="SiteVisitBooked-${index}" data-property="${property.name}" data-step="SiteVisitBooked" ${property.stepsCompleted > 2 ? 'checked' : ''}> Site Visit Booked</div>
+                            <div class="step"><input type="checkbox" class="steps-checkbox" id="ContractQuoted-${index}" name="ContractQuoted-${index}" data-property="${property.name}" data-step="ContractQuoted" ${property.stepsCompleted > 3 ? 'checked' : ''}> Contract Quoted</div>
+                            <div class="step"><input type="checkbox" class="steps-checkbox" id="SignedBuildingAquired-${index}" name="SignedBuildingAquired-${index}" data-property="${property.name}" data-step="SignedBuildingAquired" ${property.stepsCompleted > 4 ? 'checked' : ''}> Signed Building Acquired</div>
+                        ` : ''}
+                        <div>
+                            ${property.closed !== 'W' && property.closed !== 'L' ? `
+                                <button onclick="updateClosed('${property.name}', 'W')">Win</button>
+                                <button onclick="updateClosed('${property.name}', 'L')">Loss</button>
+                            ` : ''}
+                        </div>
+                    `;
+                    div.querySelectorAll('.steps-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('click', (e) => e.stopPropagation());
+                    });
+                    div.addEventListener('click', (e) => {
+                        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                            const marker = markers[property.name];
+                            if (marker) {
+                                map.setView(marker.getLatLng(), 16);
+                                marker.openPopup();
+                            }
+                        }
+                    });
+                    rottingChart.appendChild(div);
+                });
+
+            document.querySelectorAll('.steps-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', updateStepsCompleted);
+            });
+        }
+
+        function updateStepsCompleted(event) {
+            const checkbox = event.target;
+            const propertyName = checkbox.dataset.property;
+            const step = checkbox.dataset.step;
+
+            const property = scoreData.find(property => property.PropertyName === propertyName);
+            if (property) {
+                property[step] = checkbox.checked ? 'Y' : 'N';
+                fetch('/updateScore', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(property)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    refreshRottingChart();
+                })
+                .catch(error => console.error('Error updating score:', error));
+            }
+        }
+
+        function updateClosed(propertyName, status) {
+            const property = scoreData.find(property => property.PropertyName === propertyName);
+            if (property) {
+                property.Closed = status;
+                fetch('/updateScore', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(property)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    refreshRottingChart();
+                })
+                .catch(error => console.error('Error updating closed status:', error));
+            }
+        }
+
+        function promptDeleteProperty(propertyName) {
+            const adminPassword = prompt("Enter admin password to delete property:");
+            if (adminPassword === 'admin123') {
+                deleteProperty(propertyName);
+            } else {
+                alert("Incorrect password. Property deletion aborted.");
+            }
+        }
+
+        function deleteProperty(propertyName) {
+            if (confirm(`Are you sure you want to delete ${propertyName}?`)) {
+                fetch(`/deleteProperty/${propertyName}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    fetch('/data')
+                    .then(response => response.json())
+                    .then(data => {
+                        projectReconData = data.projectReconData;
+                        imagesData = data.imagesData;
+                        scoreData = data.scoreData;
+                        refreshMap();
+                        refreshRottingChart();
+                    })
+                    .catch(error => console.error('Error loading data:', error));
+                })
+                .catch(error => console.error('Error deleting property:', error));
+            }
+        }
+
+        document.getElementById('addPropertyButton').addEventListener('click', function() {
+            document.getElementById('propertyForm').style.display = 'block';
+        });
+
+        document.getElementById('exitFormButton').addEventListener('click', function() {
+            document.getElementById('propertyForm').style.display = 'none';
+        });
+
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            localStorage.removeItem('loggedIn');
+            window.location.href = 'index.html';
+        });
+
+        document.getElementById('propertyForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const formData = new FormData(this);
+
+            fetch('/addProperty', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                document.getElementById('propertyForm').reset();
+                document.getElementById('propertyForm').style.display = 'none';
+                fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    projectReconData = data.projectReconData;
+                    imagesData = data.imagesData;
+                    scoreData = data.scoreData;
+                    refreshMap();
+                    refreshRottingChart();
+                })
+                .catch(error => console.error('Error loading data:', error));
+            })
+            .catch(error => console.error('Error adding property:', error));
+        });
+
+        document.getElementById('searchBar').addEventListener('input', function() {
+            const filter = this.value;
+            refreshRottingChart(filter);
+        });
+    </script>
+</body>
+</html>
